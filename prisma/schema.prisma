@@ -1,0 +1,270 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User model for system users
+model User {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  email           String          @unique
+  password        String          // Hashed password
+  firstName       String
+  lastName        String
+  roleId          String          @db.ObjectId
+  role            Role            @relation("UserRole", fields: [roleId], references: [id])
+  owner           Owner?          @relation("UserOwner")
+  veterinarian    Veterinarian?   @relation("UserVet")
+  groomer         Groomer?        @relation("UserGroomer")
+  posts           Post[]          @relation("UserPosts")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Role model for access control
+model Role {
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  name            String            @unique // e.g., "ADMIN", "USER", "VET"
+  rolePermissions RolePermission[]  @relation("RolePermissions")
+  users           User[]            @relation("UserRole")
+  createdAt         DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+// Permission model for specific access rights
+model Permission {
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  name            String            @unique // e.g., "MANAGE_APPOINTMENTS", "VIEW_PETS", "CREATE_POSTS"
+  description     String?
+  rolePermissions RolePermission[]  @relation("RolePermissions")
+  createdAt     DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+// Explicit relation model for Role-Permission many-to-many
+model RolePermission {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  roleId        String      @db.ObjectId
+  permissionId  String      @db.ObjectId
+  role          Role        @relation("RolePermissions", fields: [roleId], references: [id])
+  permission    Permission  @relation("RolePermissions", fields: [permissionId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  @@unique([roleId, permissionId]) // Ensure unique role-permission pairs
+}
+
+
+
+// Post model for announcements or blog posts
+model Post {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  content         String
+  userId          String          @db.ObjectId
+  user            User            @relation("UserPosts", fields: [userId], references: [id])
+  categoryId      String          @db.ObjectId
+  category        Category        @relation("PostCategory", fields: [categoryId], references: [id])
+  published       Boolean         @default(false)
+  publishedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Category model for organizing posts
+model Category {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  name            String          @unique // e.g., "Announcements", "Pet Care Tips"
+  description     String?
+  posts           Post[]          @relation("PostCategory")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Owner model for pet owners
+model Owner {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String?         @unique @db.ObjectId
+  user            User?           @relation("UserOwner", fields: [userId], references: [id])
+  firstName       String
+  lastName        String
+  email           String          @unique
+  phone           String?
+  address         String?
+  pets            Pet[]           @relation("OwnerPets")
+  appointments    Appointment[]   @relation("OwnerAppointments")
+  groomingAppointments GroomingAppointment[] @relation("OwnerGroomingAppointments")
+  boardingReservations BoardingReservation[] @relation("OwnerBoardingReservations")
+  orders          Order[]         @relation("OwnerOrders")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Pet model for animals
+model Pet {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  species         String
+  breed           String?
+  age             Int?
+  ownerId         String          @db.ObjectId
+  owner           Owner           @relation("OwnerPets", fields: [ownerId], references: [id])
+  treatments      Treatment[]     @relation("PetTreatments")
+  appointments    Appointment[]   @relation("PetAppointments")
+  groomingAppointments GroomingAppointment[] @relation("PetGroomingAppointments")
+  boardingReservations BoardingReservation[] @relation("PetBoardingReservations")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Veterinarian model
+model Veterinarian {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String?         @unique @db.ObjectId
+  user            User?           @relation("UserVet", fields: [userId], references: [id])
+  firstName       String
+  lastName        String
+  specialty       String?
+  appointments    Appointment[]   @relation("VetAppointments")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Groomer model for grooming staff
+model Groomer {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String?         @unique @db.ObjectId
+  user            User?           @relation("UserGroomer", fields: [userId], references: [id])
+  firstName       String
+  lastName        String
+  appointments    GroomingAppointment[] @relation("GroomerAppointments")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Appointment model for veterinary visits
+model Appointment {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  petId           String          @db.ObjectId
+  pet             Pet             @relation("PetAppointments", fields: [petId], references: [id])
+  ownerId         String          @db.ObjectId
+  owner           Owner           @relation("OwnerAppointments", fields: [ownerId], references: [id])
+  vetId           String          @db.ObjectId
+  veterinarian    Veterinarian    @relation("VetAppointments", fields: [vetId], references: [id])
+  date            DateTime
+  reason          String
+  status          AppointmentStatus @default(SCHEDULED)
+  notes           String?
+  treatments      Treatment[]     @relation("AppointmentTreatments")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// GroomingAppointment model for grooming services
+model GroomingAppointment {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  petId           String          @db.ObjectId
+  pet             Pet             @relation("PetGroomingAppointments", fields: [petId], references: [id])
+  ownerId         String          @db.ObjectId
+  owner           Owner           @relation("OwnerGroomingAppointments", fields: [ownerId], references: [id])
+  groomerId       String          @db.ObjectId
+  groomer         Groomer         @relation("GroomerAppointments", fields: [groomerId], references: [id])
+  date            DateTime
+  services        String[]        // e.g., ["bath", "nail_trim", "haircut"]
+  status          AppointmentStatus @default(SCHEDULED)
+  notes           String?
+  cost            Float?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// BoardingReservation model for boarding services
+model BoardingReservation {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  petId           String          @db.ObjectId
+  pet             Pet             @relation("PetBoardingReservations", fields: [petId], references: [id])
+  ownerId         String          @db.ObjectId
+  owner           Owner           @relation("OwnerBoardingReservations", fields: [ownerId], references: [id])
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  kennelNumber    String?
+  specialInstructions String?
+  status          ReservationStatus @default(CONFIRMED)
+  cost            Float?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Product model for pet store inventory
+model Product {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  description     String?
+  category        String          // e.g., "food", "toys", "accessories"
+  price           Float
+  stockQuantity   Int
+  orders          OrderItem[]     @relation("ProductOrders")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Order model for pet store purchases
+model Order {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  ownerId         String          @db.ObjectId
+  owner           Owner           @relation("OwnerOrders", fields: [ownerId], references: [id])
+  items           OrderItem[]     @relation("OrderItems")
+  totalAmount     Float
+  status          OrderStatus     @default(PENDING)
+  orderDate       DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// OrderItem model for items in an order
+model OrderItem {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  orderId         String          @db.ObjectId
+  order           Order           @relation("OrderItems", fields: [orderId], references: [id])
+  productId       String          @db.ObjectId
+  product         Product         @relation("ProductOrders", fields: [productId], references: [id])
+  quantity        Int
+  unitPrice       Float
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Treatment model for medical procedures
+model Treatment {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  petId           String          @db.ObjectId
+  pet             Pet             @relation("PetTreatments", fields: [petId], references: [id])
+  appointmentId   String?         @db.ObjectId
+  appointment     Appointment?    @relation("AppointmentTreatments", fields: [appointmentId], references: [id])
+  description     String
+  date            DateTime
+  cost            Float?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
