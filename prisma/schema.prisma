@@ -12,10 +12,9 @@ model User {
   id              String          @id @default(auto()) @map("_id") @db.ObjectId
   email           String          @unique
   password        String          // Hashed password
-  firstName       String
-  lastName        String
-  roleId          String          @db.ObjectId
-  role            Role            @relation("UserRole", fields: [roleId], references: [id])
+  name            String
+  roleId          String?         @db.ObjectId
+  role            Role?           @relation("UserRole", fields: [roleId], references: [id])
   owner           Owner?          @relation("UserOwner")
   veterinarian    Veterinarian?   @relation("UserVet")
   groomer         Groomer?        @relation("UserGroomer")
